@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Угадай Кто? — Online Game</title>
+  <meta name="theme-color" content="#0d1117">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Бесплатная библиотека WebRTC для онлайн игры без серверов -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 50% 20%, #1a1f35 0%, #0a0d14 100%);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-gold: #ffb703;
+      --accent-red: #ff3366;
+      --accent-green: #00f59b;
+      --glass-bg: rgba(20, 27, 45, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --glass-glow: rgba(0, 242, 254, 0.2);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Rubik', sans-serif;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+
+    /* Верхняя светящаяся линия */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-gold), var(--accent-red));
+      z-index: 100;
+    }
+
+    /* ЭКРАНЫ */
+    .screen {
+      display: none;
+      width: 100%;
+      max-width: 900px;
+      min-height: 100vh;
+      padding: 16px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* КАРТОЧКА СТЕКЛЯННАЯ */
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 28px 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px var(--glass-glow);
+      width: 100%;
+      max-width: 440px;
+      text-align: center;
+    }
+
+    .logo-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 38px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      background: linear-gradient(135deg, #fff 20%, var(--accent-cyan) 80%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+
+    .logo-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    /* ПОЛЯ ВВОДА */
+    .input-group {
+      margin-bottom: 18px;
+      text-align: left;
+    }
+
+    .input-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .custom-input, .custom-select {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 14px 16px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 500;
+      outline: none;
+      transition: all 0.25s ease;
+    }
+
+    .custom-input:focus, .custom-select:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 16px rgba(0, 242, 254, 0.35);
+      background: rgba(15, 23, 42, 0.95);
+    }
+
+    /* КНОПКИ */
+    .btn {
+      width: 100%;
+      padding: 15px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: 'Outfit', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn:active {
+      transform: scale(0.96);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      color: #041226;
+      box-shadow: 0 8px 25px rgba(0, 242, 254, 0.35);
+    }
+
+    .btn-gold {
+      background: linear-gradient(135deg, #ff9f1c, var(--accent-gold));
+      color: #1e1300;
+      box-shadow: 0 8px 25px rgba(255, 183, 3, 0.35);
+    }
+
+    .btn-red {
+      background: linear-gradient(135deg, #e63946, var(--accent-red));
+      color: #fff;
+    }
+
+    .btn-outline {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1.5px solid var(--glass-border);
+      color: var(--text-main);
+    }
+
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* ИГРОВОЙ ЭКРАН (HUD) */
+    .game-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 12px 18px;
+      margin-bottom: 12px;
+    }
+
+    .score-badge {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--accent-gold);
+      background: rgba(255, 183, 3, 0.15);
+      border: 1px solid rgba(255, 183, 3, 0.3);
+      padding: 6px 14px;
+      border-radius: 12px;
+    }
+
+    .turn-indicator {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .turn-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+    }
+
+    .turn-status {
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--accent-cyan);
+    }
+
+    .timer-ring {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 900;
+      min-width: 50px;
+      text-align: center;
+      padding: 6px 12px;
+      border-radius: 12px;
+      background: rgba(0, 242, 254, 0.12);
+      border: 1px solid var(--accent-cyan);
+      color: var(--accent-cyan);
+      transition: all 0.3s ease;
+    }
+
+    .timer-ring.danger {
+      background: rgba(255, 51, 102, 0.2);
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.08); }
+    }
+
+    /* БЛОК СЕКРЕТНОЙ КАРТЫ */
+    .secret-box-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      padding: 8px 14px;
+      margin-bottom: 12px;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .secret-preview-card {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      background: #0f172a;
+      border: 2px solid var(--accent-gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: 0 0 12px rgba(255, 183, 3, 0.35);
+      overflow: hidden;
+    }
+
+    .secret-preview-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .secret-info-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-gold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .secret-info-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* ИГРОВОЕ ПОЛЕ 5x5 */
+    .board-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      width: 100%;
+      max-width: 700px;
+      aspect-ratio: 1 / 1;
+      margin-bottom: 16px;
+      perspective: 1000px;
+    }
+
+    /* КАРТОЧКА */
+    .card-item {
+      position: relative;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1.5px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, box-shadow 0.2s;
+      transform-style: preserve-3d;
+      padding: 6px;
+      aspect-ratio: 1 / 1;
+    }
+
+    .card-item:hover {
+      transform: translateY(-3px) scale(1.03);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 8px 20px rgba(0, 242, 254, 0.25);
+    }
+
+    .card-icon {
+      font-size: 32px;
+      margin-bottom: 4px;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+    }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #cbd5e1;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 95%;
+    }
+
+    /* Выбранная карточка (для хода) */
+    .card-item.selected {
+      border-color: var(--accent-gold);
+      background: rgba(255, 183, 3, 0.18);
+      box-shadow: 0 0 16px rgba(255, 183, 3, 0.4);
+      transform: scale(0.94);
+    }
+
+    .card-item.selected::after {
+      content: '✓';
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--accent-gold);
+    }
+
+    /* Закрытая карточка (выбита) */
+    .card-item.closed {
+      background: rgba(15, 23, 42, 0.95);
+      border-color: rgba(255, 255, 255, 0.04);
+      transform: rotateX(180deg) scale(0.92);
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    .card-item.closed .card-icon,
+    .card-item.closed .card-label {
+      visibility: hidden;
+    }
+
+    .card-item.closed::before {
+      content: '✖';
+      position: absolute;
+      font-size: 28px;
+      color: var(--accent-red);
+      transform: rotateX(180deg);
+      opacity: 0.8;
+    }
+
+    /* НИЖНЯЯ ПАНЕЛЬ ДЕЙСТВИЙ */
+    .action-panel {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 700px;
+      margin-bottom: 12px;
+    }
+
+    /* ЧАТ */
+    .chat-section {
+      width: 100%;
+      max-width: 700px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-messages {
+      height: 90px;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .chat-msg {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 5px 10px;
+      border-radius: 8px;
+      word-break: break-word;
+    }
+
+    .chat-msg.self {
+      align-self: flex-end;
+      background: rgba(0, 242, 254, 0.15);
+      border-left: 3px solid var(--accent-cyan);
+    }
+
+    .chat-input-bar {
+      display: flex;
+      border-top: 1px solid var(--glass-border);
+    }
+
+    .chat-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .chat-send-btn {
+      background: var(--accent-cyan);
+      border: none;
+      color: #041226;
+      font-weight: 700;
+      padding: 0 16px;
+      cursor: pointer;
+    }
+
+    /* МОДАЛЬНЫЕ ОКНА (Победа / Поражение) */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .result-box {
+      background: var(--glass-bg);
+      border: 2px solid var(--accent-gold);
+      border-radius: 28px;
+      padding: 36px 24px;
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 0 50px rgba(255, 183, 3, 0.3);
+      animation: popModal 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes popModal {
+      from { transform: scale(0.7); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .result-icon {
+      font-size: 64px;
+      margin-bottom: 12px;
+    }
+
+    .result-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 32px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+
+    .result-desc {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    /* АДАПТИВНОСТЬ ПОД МОБИЛКИ И ПОВОРОТ */
+    @media (max-height: 700px) and (orientation: landscape) {
+      .screen {
+        flex-direction: row;
+        gap: 16px;
+        padding: 8px;
+      }
+      .board-grid {
+        max-width: 50vh;
+        gap: 4px;
+      }
+      .side-controls {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .chat-messages {
+        height: 60px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .board-grid {
+        gap: 5px;
+      }
+      .card-item {
+        border-radius: 10px;
+        padding: 4px;
+      }
+      .card-icon {
+        font-size: 24px;
+      }
+      .card-label {
+        font-size: 9px;
+      }
+      .action-panel .btn {
+        font-size: 13px;
+        padding: 12px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== ЭКРАН 1: ВХОД (LOGIN) ==================== -->
+  <section id="loginScreen" class="screen active">
+    <div class="glass-card">
+      <h1 class="logo-title">Угадай Кто?</h1>
+      <p class="logo-subtitle">Премиальная сетевая дуэль 1 на 1</p>
+
+      <div class="input-group">
+        <label class="input-label">Твой никнейм</label>
+        <input type="text" id="playerNameInput" class="custom-input" placeholder="Например: Чемпион" maxlength="15">
+      </div>
+
+      <button id="connectBtn" class="btn btn-primary" onclick="connectOnline()">
+        ⚡ Войти в игру
+      </button>
+
+      <p id="connectStatus" style="font-size: 13px; color: var(--accent-cyan); margin-top: 14px; display: none;">
+        Подключение к сети...
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== ЭКРАН 2: ЛОББИ (LOBBY) ==================== -->
+  <section id="lobbyScreen" class="screen">
+    <div class="glass-card">
+      <h1 class="logo-title" style="font-size: 28px;">Комнаты</h1>
+      <p class="logo-subtitle">Создай код или подключись к другу</p>
+
+      <button class="btn btn-gold" onclick="createRoom()" style="margin-bottom: 20px;">
+        ✨ Создать комнату
+      </button>
+
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+        <div style="flex: 1; height: 1px; background: var(--glass-border);"></div>
+        <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">ИЛИ</span>
+        <div style="flex: 1; height: 1px; background: var(--glass-border);"></div>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Код комнаты друга (4 цифры)</label>
+        <input type="number" id="joinCodeInput" class="custom-input" placeholder="Например: 7421" style="letter-spacing: 4px; text-align: center; font-size: 20px;">
+      </div>
+
+      <button class="btn btn-outline" onclick="joinRoomByCode()">
+        🔗 Подключиться
+      </button>
+
+      <p id="lobbyStatus" style="font-size: 13px; color: var(--accent-red); margin-top: 14px; display: none;"></p>
+    </div>
+  </section>
+
+  <!-- ==================== ЭКРАН 3: ОЖИДАНИЕ В КОМНАТЕ ==================== -->
+  <section id="roomScreen" class="screen">
+    <div class="glass-card">
+      <span style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Код твоей комнаты</span>
+      <h2 id="roomCodeDisplay" style="font-family: 'Outfit'; font-size: 48px; color: var(--accent-gold); letter-spacing: 6px; margin: 6px 0 16px;">----</h2>
+
+      <div class="input-group">
+        <label class="input-label">Выбор тематического пака</label>
+        <select id="packSelect" class="custom-select" onchange="onPackChanged()">
+          <option value="cars">🚗 Марки Автомобилей (25)</option>
+          <option value="ufc">🥊 Бойцы UFC & ММА (25)</option>
+          <option value="flags">🌍 Флаги стран мира (25)</option>
+        </select>
+      </div>
+
+      <div id="playerWaitingBadge" style="background: rgba(0, 242, 254, 0.1); border: 1px solid var(--accent-cyan); border-radius: 12px; padding: 12px; margin-bottom: 20px; font-size: 14px;">
+        ⏳ Ожидаем второго игрока... (1/2)
+      </div>
+
+      <button id="startGameBtn" class="btn btn-primary" onclick="requestStartGame()" disabled>
+        🚀 Начать дуэль
+      </button>
+    </div>
+  </section>
+
+  <!-- ==================== ЭКРАН 4: САМА ИГРА (DUEL) ==================== -->
+  <section id="gameScreen" class="screen">
+    
+    <!-- Шапка игры -->
+    <div class="game-header">
+      <div class="score-badge" id="scoreDisplay">0 : 0</div>
+      <div class="turn-indicator">
+        <span class="turn-title" id="phaseTitle">Фаза выбора</span>
+        <span class="turn-status" id="turnStatus">ВЫБЕРИ СВОЮ КАРТУ</span>
+      </div>
+      <div class="timer-ring" id="timerDisplay">30</div>
+    </div>
+
+    <!-- Твоя секретная карта -->
+    <div class="secret-box-wrapper">
+      <div class="secret-preview-card" id="mySecretPreview">❓</div>
+      <div>
+        <div class="secret-info-title">Твоя секретная карта:</div>
+        <div class="secret-info-name" id="mySecretName">Нажми на карту в сетке!</div>
+      </div>
+    </div>
+
+    <!-- Сетка карточек 5х5 -->
+    <div class="board-grid" id="boardGrid"></div>
+
+    <!-- Кнопки управления -->
+    <div class="action-panel">
+      <button id="confirmTurnBtn" class="btn btn-primary" onclick="confirmCloseTurn()" disabled>
+        ❌ Закрыть карты
+      </button>
+      <button id="guessFinalBtn" class="btn btn-gold" onclick="makeFinalGuess()" disabled>
+        🎯 Угадать досрочно!
+      </button>
+    </div>
+
+    <!-- Мини-чат -->
+    <div class="chat-section">
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-msg">Добро пожаловать в дуэль! Задавай вопросы сопернику.</div>
+      </div>
+      <div class="chat-input-bar">
+        <input type="text" id="chatInput" class="chat-input" placeholder="Задать вопрос..." onkeydown="if(event.key==='Enter') sendChat()">
+        <button class="chat-send-btn" onclick="sendChat()">➤</button>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==================== МОДАЛКА РЕЗУЛЬТАТА РАУНДА ==================== -->
+  <div id="resultModal" class="modal-overlay">
+    <div class="result-box">
+      <div class="result-icon" id="resultEmoji">🏆</div>
+      <h2 class="result-title" id="resultTitle">ПОБЕДА!</h2>
+      <p class="result-desc" id="resultDesc">Ты угадал секретную карту соперника!</p>
+      <button class="btn btn-primary" onclick="startNewRound()">
+        🔄 Следующий раунд
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== СКРИПТЫ ИГРЫ (JAVASCRIPT) ==================== -->
+  <script>
+    /* ========================================================
+       1. БАЗА ДАННЫХ ПАКОВ (ПО 25 ШТУК ДЛЯ СЕТКИ 5x5)
+    ======================================================== */
+    const PACKS = {
+      cars: [
+        { name: "Audi", icon: "🚘" }, { name: "BMW", icon: "🏎️" }, { name: "Bugatti", icon: "⚡" },
+        { name: "Ferrari", icon: "🐎" }, { name: "Ford", icon: "🚙" }, { name: "Geely", icon: "🚖" },
+        { name: "Honda", icon: "🚗" }, { name: "Hyundai", icon: "🚘" }, { name: "Jeep", icon: "🚙" },
+        { name: "Kia", icon: "🏎️" }, { name: "Lada", icon: "🚗" }, { name: "Lamborghini", icon: "🐂" },
+        { name: "Lexus", icon: "💎" }, { name: "Mercedes", icon: "⭐" }, { name: "Peugeot", icon: "🦁" },
+        { name: "Porsche", icon: "🏆" }, { name: "Renault", icon: "🚘" }, { name: "Chevrolet", icon: "🚗" },
+        { name: "Skoda", icon: "🚙" }, { name: "Subaru", icon: "🌌" }, { name: "Suzuki", icon: "🏎️" },
+        { name: "Tesla", icon: "🔋" }, { name: "Toyota", icon: "🎌" }, { name: "Volvo", icon: "🛡️" },
+        { name: "Volkswagen", icon: "🚙" }
+      ],
+      ufc: [
+        { name: "Хабиб", icon: "🦅" }, { name: "Конор", icon: "🇮🇪" }, { name: "Джон Джонс", icon: "🦴" },
+        { name: "Ислам Махачев", icon: "🥇" }, { name: "Перейра", icon: "🗿" }, { name: "Адесанья", icon: "✨" },
+        { name: "Оливейра", icon: "🇧🇷" }, { name: "Порье", icon: "💎" }, { name: "Гейджи", icon: "👊" },
+        { name: "Чимаев", icon: "🐺" }, { name: "Сехудо", icon: "🥇" }, { name: "Волкановски", icon: "🦘" },
+        { name: "Холлоуэй", icon: "🌺" }, { name: "Стерлинг", icon: "🎒" }, { name: "О'Мэлли", icon: "🍭" },
+        { name: "Усман", icon: "🇳🇬" }, { name: "Ковингтон", icon: "🇺🇸" }, { name: "Бернс", icon: "🔥" },
+        { name: "Миочич", icon: "🚒" }, { name: "Нганну", icon: "⚡" }, { name: "Аспиналл", icon: "🥊" },
+        { name: "Павлович", icon: "🐻" }, { name: "Ян", icon: "🇷🇺" }, { name: "Морено", icon: "🇲🇽" },
+        { name: "Фигейредо", icon: "⚡" }
+      ],
+      flags: [
+        { name: "Россия", icon: "🇷🇺" }, { name: "США", icon: "🇺🇸" }, { name: "Германия", icon: "🇩🇪" },
+        { name: "Франция", icon: "🇫🇷" }, { name: "Италия", icon: "🇮🇹" }, { name: "Испания", icon: "🇪🇸" },
+        { name: "Бразилия", icon: "🇧🇷" }, { name: "Аргентина", icon: "🇦🇷" }, { name: "Китай", icon: "🇨🇳" },
+        { name: "Япония", icon: "🇯🇵" }, { name: "Канада", icon: "🇨🇦" }, { name: "Великобритания", icon: "🇬🇧" },
+        { name: "Турция", icon: "🇹🇷" }, { name: "Казахстан", icon: "🇰🇿" }, { name: "ОАЭ", icon: "🇦🇪" },
+        { name: "Мексика", icon: "🇲🇽" }, { name: "Португалия", icon: "🇵🇹" }, { name: "Нидерланды", icon: "🇳🇱" },
+        { name: "Швеция", icon: "🇸🇪" }, { name: "Норвегия", icon: "🇳🇴" }, { name: "Индия", icon: "🇮🇳" },
+        { name: "Австралия", icon: "🇦🇺" }, { name: "Египет", icon: "🇪🇬" }, { name: "Греция", icon: "🇬🇷" },
+        { name: "Южная Корея", icon: "🇰🇷" }
+      ]
+    };
+
+    /* ========================================================
+       2. ВШИТЫЙ ЗВУКОВОЙ ДВИЖОК (WEB AUDIO API)
+    ======================================================== */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playTone(freq, duration, type = 'sine') {
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    const SFX = {
+      click: () => playTone(580, 0.08, 'triangle'),
+      flip: () => playTone(320, 0.15, 'sine'),
+      countdown: () => playTone(880, 0.07, 'sine'),
+      victory: () => {
+        setTimeout(() => playTone(523, 0.2), 0);
+        setTimeout(() => playTone(659, 0.2), 150);
+        setTimeout(() => playTone(783, 0.3), 300);
+        setTimeout(() => playTone(1046, 0.5), 450);
+      },
+      defeat: () => {
+        setTimeout(() => playTone(400, 0.25, 'sawtooth'), 0);
+        setTimeout(() => playTone(350, 0.35, 'sawtooth'), 200);
+      }
+    };
+
+    /* ========================================================
+       3. ПЕРЕМЕННЫЕ СОСТОЯНИЯ СЕТИ И ИГРЫ
+    ======================================================== */
+    let peer = null;
+    let conn = null;
+    let myNick = "Игрок";
+    let isHost = false;
+    let currentPackKey = "cars";
+
+    let mySecretCardIndex = -1;
+    let opponentSecretIndex = -1;
+    let currentRoundScore = { host: 0, guest: 0 };
+
+    let isSelectionPhase = true;
+    let isMyTurn = false;
+    let timerValue = 30;
+    let timerInterval = null;
+
+    let cardStates = []; // { closed: bool, selected: bool }
+
+    /* ========================================================
+       4. СЕТЕВОЕ ПОДКЛЮЧЕНИЕ (PEERJS)
+    ======================================================== */
+    function switchScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+    }
+
+    function connectOnline() {
+      const input = document.getElementById('playerNameInput').value.trim();
+      if (!input) {
+        alert("Пожалуйста, введите ваш никнейм!");
+        return;
+      }
+      myNick = input;
+      document.getElementById('connectStatus').style.display = 'block';
+
+      // Создаем Peer ID
+      peer = new Peer();
+
+      peer.on('open', (id) => {
+        document.getElementById('connectStatus').style.display = 'none';
+        switchScreen('lobbyScreen');
+      });
+
+      peer.on('connection', (incomingConn) => {
+        conn = incomingConn;
+        setupConnectionListeners();
+      });
+
+      peer.on('error', (err) => {
+        alert("Сетевая ошибка: " + err.type);
+      });
+    }
+
+    function createRoom() {
+      isHost = true;
+      const roomCode = Math.floor(1000 + Math.random() * 9000).toString();
+      
+      if (peer) peer.destroy();
+      peer = new Peer("guesswho-" + roomCode);
+
+      peer.on('open', () => {
+        document.getElementById('roomCodeDisplay').innerText = roomCode;
+        document.getElementById('packSelect').disabled = false;
+        switchScreen('roomScreen');
+      });
+
+      peer.on('connection', (incomingConn) => {
+        conn = incomingConn;
+        setupConnectionListeners();
+        document.getElementById('playerWaitingBadge').innerHTML = "✅ Друг подключился! (2/2)";
+        document.getElementById('startGameBtn').disabled = false;
+      });
+    }
+
+    function joinRoomByCode() {
+      const code = document.getElementById('joinCodeInput').value.trim();
+      if (code.length < 4) {
+        alert("Введите правильный 4-значный код комнаты!");
+        return;
+      }
+      isHost = false;
+      const targetId = "guesswho-" + code;
+
+      conn = peer.connect(targetId);
+      setupConnectionListeners();
+
+      document.getElementById('lobbyStatus').style.display = 'block';
+      document.getElementById('lobbyStatus').innerText = "Подключение к комнате " + code + "...";
+    }
+
+    function setupConnectionListeners() {
+      conn.on('open', () => {
+        document.getElementById('lobbyStatus').style.display = 'none';
+        if (!isHost) {
+          document.getElementById('roomCodeDisplay').innerText = "ПОДКЛЮЧЕНО";
+          document.getElementById('packSelect').disabled = true;
+          document.getElementById('playerWaitingBadge').innerHTML = "Ожидаем хоста...";
+          switchScreen('roomScreen');
+        }
+      });
+
+      conn.on('data', (data) => {
+        handleNetworkData(data);
+      });
+    }
+
+    function onPackChanged() {
+      if (!isHost) return;
+      currentPackKey = document.getElementById('packSelect').value;
+      conn.send({ type: 'PACK_SYNC', pack: currentPackKey });
+    }
+
+    function requestStartGame() {
+      if (!isHost) return;
+      currentPackKey = document.getElementById('packSelect').value;
+      conn.send({ type: 'START_MATCH', pack: currentPackKey });
+      startMatchLocally(currentPackKey);
+    }
+
+    function handleNetworkData(data) {
+      switch (data.type) {
+        case 'PACK_SYNC':
+          currentPackKey = data.pack;
+          document.getElementById('packSelect').value = data.pack;
+          break;
+
+        case 'START_MATCH':
+          currentPackKey = data.pack;
+          startMatchLocally(data.pack);
+          break;
+
+        case 'SECRET_CARD_CHOSEN':
+          opponentSecretIndex = data.cardIndex;
+          break;
+
+        case 'SWITCH_TURN':
+          isMyTurn = true;
+          updateTurnVisuals();
+          startTurnTimer(60);
+          break;
+
+        case 'MATCH_VICTORY':
+          handleVictoryDefeat(data.winnerIsHost);
+          break;
+
+        case 'CHAT':
+          addChatMessage(data.sender, data.text, false);
+          break;
+
+        case 'NEW_ROUND':
+          startMatchLocally(currentPackKey);
+          break;
+      }
+    }
+
+    /* ========================================================
+       5. ИГРОВАЯ ЛОГИКА И СЕТКА КАРТОЧЕК
+    ======================================================== */
+    function startMatchLocally(packKey) {
+      document.getElementById('resultModal').classList.remove('active');
+      switchScreen('gameScreen');
+
+      isSelectionPhase = true;
+      mySecretCardIndex = -1;
+      opponentSecretIndex = -1;
+
+      document.getElementById('mySecretPreview').innerText = "❓";
+      document.getElementById('mySecretName').innerText = "Выбери карту ниже!";
+      document.getElementById('phaseTitle').innerText = "Фаза выбора";
+      document.getElementById('turnStatus').innerText = "ВЫБЕРИ СВОЮ КАРТУ";
+
+      buildGrid(PACKS[packKey]);
+      startSelectionTimer(30);
+    }
+
+    function buildGrid(packItems) {
+      const grid = document.getElementById('boardGrid');
+      grid.innerHTML = '';
+      cardStates = [];
+
+      packItems.forEach((item, index) => {
+        cardStates.push({ closed: false, selected: false });
+
+        const card = document.createElement('div');
+        card.className = 'card-item';
+        card.id = `card-${index}`;
+        card.onclick = () => onCardClick(index);
+
+        card.innerHTML = `
+          <div class="card-icon">${item.icon}</div>
+          <div class="card-label">${item.name}</div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function onCardClick(index) {
+      SFX.click();
+
+      // 1. В фазе выбора игрок кликает на свою секретную карту
+      if (isSelectionPhase) {
+        mySecretCardIndex = index;
+        const cardData = PACKS[currentPackKey][index];
+        document.getElementById('mySecretPreview').innerText = cardData.icon;
+        document.getElementById('mySecretName').innerText = cardData.name;
+        return;
+      }
+
+      // 2. Во время своего хода игрок выделяет карты, которые хочет убрать
+      if (!isMyTurn || cardStates[index].closed) return;
+
+      cardStates[index].selected = !cardStates[index].selected;
+      document.getElementById(`card-${index}`).classList.toggle('selected', cardStates[index].selected);
+
+      updateActionButtonsState();
+    }
+
+    function updateActionButtonsState() {
+      const selectedCount = cardStates.filter(c => c.selected).length;
+      document.getElementById('confirmTurnBtn').disabled = (!isMyTurn || selectedCount === 0);
+      document.getElementById('guessFinalBtn').disabled = (!isMyTurn || selectedCount !== 1);
+    }
+
+    /* ========================================================
+       6. ТАЙМЕРЫ И ХОДЫ
+    ======================================================== */
+    function startSelectionTimer(seconds) {
+      clearInterval(timerInterval);
+      timerValue = seconds;
+      updateTimerUI(timerValue);
+
+      timerInterval = setInterval(() => {
+        timerValue--;
+        updateTimerUI(timerValue);
+
+        if (timerValue <= 3) SFX.countdown();
+
+        if (timerValue <= 0) {
+          clearInterval(timerInterval);
+          endSelectionPhase();
+        }
+      }, 1000);
+    }
+
+    function endSelectionPhase() {
+      // Если игрок не выбрал карту — берем случайную
+      if (mySecretCardIndex === -1) {
+        onCardClick(Math.floor(Math.random() * 25));
+      }
+
+      // Отправляем сопернику свой выбор
+      conn.send({ type: 'SECRET_CARD_CHOSEN', cardIndex: mySecretCardIndex });
+
+      isSelectionPhase = false;
+      document.getElementById('phaseTitle').innerText = "Дуэль";
+
+      // Первый ход делает создатель комнаты (Хост)
+      isMyTurn = isHost;
+      updateTurnVisuals();
+      startTurnTimer(60);
+    }
+
+    function startTurnTimer(seconds) {
+      clearInterval(timerInterval);
+      timerValue = seconds;
+      updateTimerUI(timerValue);
+
+      timerInterval = setInterval(() => {
+        timerValue--;
+        updateTimerUI(timerValue);
+
+        if (timerValue <= 5) SFX.countdown();
+
+        if (timerValue <= 0) {
+          clearInterval(timerInterval);
+          if (isMyTurn) {
+            confirmCloseTurn(); // Авто-сброс хода по таймеру
+          }
+        }
+      }, 1000);
+    }
+
+    function updateTimerUI(val) {
+      const timerEl = document.getElementById('timerDisplay');
+      timerEl.innerText = val;
+      timerEl.classList.toggle('danger', val <= 5);
+    }
+
+    function updateTurnVisuals() {
+      document.getElementById('turnStatus').innerText = isMyTurn ? "ТВОЙ ХОД" : "ХОД ДРУГА...";
+      document.getElementById('turnStatus').style.color = isMyTurn ? "var(--accent-cyan)" : "var(--accent-red)";
+      updateActionButtonsState();
+    }
+
+    function confirmCloseTurn() {
+      if (!isMyTurn) return;
+      SFX.flip();
+
+      // Закрываем все выделенные карточки
+      cardStates.forEach((st, idx) => {
+        if (st.selected) {
+          st.closed = true;
+          st.selected = false;
+          const el = document.getElementById(`card-${idx}`);
+          el.classList.remove('selected');
+          el.classList.add('closed');
+        }
+      });
+
+      isMyTurn = false;
+      updateTurnVisuals();
+      conn.send({ type: 'SWITCH_TURN' });
+      startTurnTimer(60);
+    }
+
+    /* ========================================================
+       7. ДОСРОЧНЫЙ ОТВЕТ И ПОБЕДА
+    ======================================================== */
+    function makeFinalGuess() {
+      if (!isMyTurn) return;
+
+      const guessedIdx = cardStates.findIndex(c => c.selected);
+      if (guessedIdx === -1) return;
+
+      const isCorrect = (guessedIdx === opponentSecretIndex);
+      const winnerIsHost = isCorrect ? isHost : !isHost;
+
+      conn.send({ type: 'MATCH_VICTORY', winnerIsHost });
+      handleVictoryDefeat(winnerIsHost);
+    }
+
+    function handleVictoryDefeat(winnerIsHost) {
+      clearInterval(timerInterval);
+
+      const iWon = (isHost && winnerIsHost) || (!isHost && !winnerIsHost);
+
+      if (winnerIsHost) currentRoundScore.host++;
+      else currentRoundScore.guest++;
+
+      document.getElementById('scoreDisplay').innerText = `${currentRoundScore.host} : ${currentRoundScore.guest}`;
+
+      const modal = document.getElementById('resultModal');
+      const title = document.getElementById('resultTitle');
+      const desc = document.getElementById('resultDesc');
+      const emoji = document.getElementById('resultEmoji');
+
+      if (iWon) {
+        SFX.victory();
+        emoji.innerText = "🏆";
+        title.innerText = "ПОБЕДА!";
+        title.style.color = "var(--accent-gold)";
+        desc.innerText = "Ты блестяще раскусил карту соперника!";
+      } else {
+        SFX.defeat();
+        emoji.innerText = "😢";
+        title.innerText = "ПОРАЖЕНИЕ";
+        title.style.color = "var(--accent-red)";
+        desc.innerText = "Соперник оказался быстрее или ты ошибся!";
+      }
+
+      modal.classList.add('active');
+    }
+
+    function startNewRound() {
+      if (isHost) {
+        conn.send({ type: 'NEW_ROUND' });
+        startMatchLocally(currentPackKey);
+      } else {
+        alert("Ожидайте, пока создатель комнаты запустит следующий раунд.");
+      }
+    }
+
+    /* ========================================================
+       8. ОНЛАЙН-ЧАТ
+    ======================================================== */
+    function sendChat() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      addChatMessage(myNick, text, true);
+      conn.send({ type: 'CHAT', sender: myNick, text });
+      input.value = '';
+    }
+
+    function addChatMessage(sender, text, isSelf) {
+      const box = document.getElementById('chatMessages');
+      const msg = document.createElement('div');
+      msg.className = `chat-msg ${isSelf ? 'self' : ''}`;
+      msg.innerHTML = `<strong>${sender}:</strong> ${text}`;
+      box.appendChild(msg);
+      box.scrollTop = box.scrollHeight;
+    }
+  </script>
+</body>
+</html>
