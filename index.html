@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Угадай Кто? — Премиум Онлайн</title>
-  
+
   <link rel="stylesheet" href="style.css">
-  
+
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  
+
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -20,7 +20,7 @@
     <section id="authScreen" class="screen">
       <div class="glass-panel">
         <h1 class="logo-text">УГАДАЙ КТО?</h1>
-        <p class="logo-sub">Сетевая дуэль на двоих</p>
+        <p class="logo-sub">Премиальная дуэль на двоих онлайн</p>
 
         <div class="auth-tabs">
           <button id="tabLogin" class="tab-btn active" onclick="switchAuthMode('login')">Вход</button>
@@ -37,23 +37,33 @@
           <input type="password" id="authPass" class="styled-input" placeholder="Минимум 6 символов" autocomplete="current-password">
         </div>
 
-        <button id="authSubmitBtn" class="action-btn btn-blue" onclick="handleAuth()">Войти</button>
+        <button id="authSubmitBtn" class="action-btn btn-blue" onclick="handleAuth()">Войти в аккаунт</button>
         <p id="authMessage" class="error-text"></p>
       </div>
     </section>
 
     <section id="lobbyScreen" class="screen hidden">
       <div class="glass-panel">
-        <div class="user-profile-header">
-          <span id="userBadgeLabel">👤 Игрок</span>
+        <div class="user-card-header">
+          <div class="avatar-wrapper" onclick="triggerAvatarUpload()">
+            <div id="myAvatarImg" class="avatar-circle">A</div>
+            <div class="avatar-edit-overlay">📷</div>
+          </div>
+          <input type="file" id="avatarFileInput" accept="image/*" style="display: none;" onchange="handleAvatarFileSelected(event)">
+
+          <div class="user-info-text">
+            <h3 id="userBadgeLabel">Игрок</h3>
+            <p id="userStatsLabel" class="stats-text">Побед: 0 | Игр: 0</p>
+          </div>
+
           <button class="logout-btn" onclick="handleLogout()">Выйти</button>
         </div>
 
-        <h2 style="font-size: 20px; text-align: center; margin-bottom: 16px;">Выбор комнаты</h2>
-        <button class="action-btn btn-gold" onclick="createNewRoom()">✨ Создать новую комнату</button>
+        <h2 style="font-size: 18px; text-align: center; margin-bottom: 14px;">Выбор комнаты</h2>
+        <button class="action-btn btn-gold" onclick="createNewRoom()">✨ Создать комнату</button>
 
         <div class="divider-line">
-          <span>ИЛИ ПОДКЛЮЧИТЕСЬ</span>
+          <span>ИЛИ ВВЕДИТЕ КОД</span>
         </div>
 
         <div class="input-box">
@@ -61,28 +71,28 @@
           <input type="number" id="roomJoinInput" class="styled-input text-center font-bold" placeholder="0000">
         </div>
 
-        <button class="action-btn btn-outline" onclick="joinRoomByCode()">🔗 Войти в комнату</button>
+        <button class="action-btn btn-outline" onclick="joinRoomByCode()">🔗 Войти по коду</button>
         <p id="lobbyMessage" class="error-text"></p>
       </div>
     </section>
 
     <section id="roomScreen" class="screen hidden">
       <div class="glass-panel text-center">
-        <p class="field-label">Код для подключения друга</p>
+        <p class="field-label">Код комнаты</p>
         <h2 id="roomCodeDisplay" class="giant-code">----</h2>
 
         <div class="input-box text-left">
           <label class="field-label">Выберите тематический пак</label>
           <select id="packSelector" class="styled-select" onchange="onPackSelectionChanged()">
             <option value="cars">🚗 Марки Машин</option>
-            <option value="celebrities">🌟 Знаменитости</option>
-            <option value="bloggers">🎥 Блогеры</option>
             <option value="ufc">🥊 Бойцы UFC</option>
+            <option value="emoji">😀 Эмодзи</option>
             <option value="flags">🌍 Флаги стран</option>
             <option value="food">🍕 Блюда мира</option>
-            <option value="emoji">😀 Эмодзи</option>
-            <option value="animals">🦁 Животные</option>
             <option value="fruits">🍎 Фрукты</option>
+            <option value="animals">🦁 Животные</option>
+            <option value="celebrities">🌟 Знаменитости</option>
+            <option value="bloggers">🎥 Блогеры</option>
             <option value="brands">🏷️ Бренды</option>
           </select>
         </div>
@@ -96,13 +106,31 @@
     </section>
 
     <section id="gameScreen" class="screen hidden">
-      <div class="hud-header">
-        <div id="gameScoreLabel" class="hud-score">0 : 0</div>
-        <div class="hud-turn-info">
-          <span id="gamePhaseLabel" class="hud-phase">Фаза выбора</span>
-          <span id="gameTurnLabel" class="hud-status">ВЫБЕРИТЕ СВОЮ КАРТУ</span>
+      <div class="versus-hud">
+        <div class="player-hud-box">
+          <div id="hudMyAvatar" class="avatar-circle mini">Я</div>
+          <div>
+            <div id="hudMyName" class="hud-player-name">Вы</div>
+            <div id="hudMyScore" class="hud-player-score">Счет: 0</div>
+          </div>
         </div>
-        <div id="gameTimerLabel" class="hud-timer">30</div>
+
+        <div class="hud-center-status">
+          <div id="gameTimerLabel" class="hud-timer">30</div>
+          <div id="gamePhaseLabel" class="hud-phase">ФАЗА ВЫБОРА</div>
+        </div>
+
+        <div class="player-hud-box right">
+          <div>
+            <div id="hudOpponentName" class="hud-player-name">Соперник</div>
+            <div id="hudOpponentScore" class="hud-player-score">Счет: 0</div>
+          </div>
+          <div id="hudOpponentAvatar" class="avatar-circle mini red">С</div>
+        </div>
+      </div>
+
+      <div id="gameTurnBar" class="turn-banner">
+        ВЫБЕРИТЕ СВОЮ ТАЙНУЮ КАРТУ В СЕТКЕ
       </div>
 
       <div class="secret-card-preview-bar">
@@ -122,10 +150,10 @@
 
       <div class="chat-container">
         <div id="chatMessages" class="chat-messages-area">
-          <div style="color: var(--text-gray); font-style: italic;">Чат комнаты открыт. Задавайте вопросы сопернику!</div>
+          <div style="color: var(--text-gray); font-style: italic;">Чат открыт. Задавайте вопросы по очереди!</div>
         </div>
         <div class="chat-input-bar">
-          <input type="text" id="chatInput" placeholder="Задать вопрос..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+          <input type="text" id="chatInput" placeholder="Ваш вопрос..." onkeydown="if(event.key==='Enter') sendChatMessage()">
           <button onclick="sendChatMessage()">➤</button>
         </div>
       </div>
@@ -137,8 +165,8 @@
     <div class="modal-box">
       <span id="modalEmoji" style="font-size: 64px;">🏆</span>
       <h2 id="modalTitle">ПОБЕДА!</h2>
-      <p id="modalDesc">Вы угадали карту соперника!</p>
-      <button class="action-btn btn-blue" onclick="restartNewRound()" style="margin-top: 16px;">🔄 Следующий раунд</button>
+      <p id="modalDesc">Вы отлично угадали карту соперника!</p>
+      <button class="action-btn btn-blue" onclick="returnToLobbyMenu()" style="margin-top: 16px;">🏠 В главное меню</button>
     </div>
   </div>
 
