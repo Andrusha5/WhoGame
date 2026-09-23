@@ -45,7 +45,7 @@ const PACK_REGISTRY = {
     { name: "Холлоуэй", file: "Holloway.jfif" }, { name: "Махачев", file: "Islam.jfif" },
     { name: "Джон Джонс", file: "John.jfif" }, { name: "Хабиб", file: "Khabib.jfif" },
     { name: "Двалишвили", file: "Merab.jfif" }, { name: "Оливейра", file: "Oliveira.jfif" },
-    { name: "О'Мэлли", file: "Omelli.jfif" }, { name: "Павлович", file: "Pavlovich.jfif" },
+    { name: "О'Мэлли", file: "Omelli.jfif" }, { name: "Уокер", file: "Walker.jfif" },
     { name: "Перейра", file: "Pereira.jfif" }, { name: "Петр Ян", file: "Petr.jfif" },
     { name: "Порье", file: "Porier.jfif" }, { name: "Рахмонов", file: "Shavkat.jfif" },
     { name: "Шовхал", file: "Shovhal.jfif" }, { name: "Стрикленд", file: "Strik.jfif" },
