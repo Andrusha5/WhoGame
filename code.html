@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Угадай Кто? — Премиум Онлайн</title>
+  
+  <!-- Подключаем стили -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Подключаем официальные библиотеки Firebase (v10 COMPAT для стабильности) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  
+  <!-- Подключаем наш скрипт -->
+  <script defer src="app.js"></script>
+</head>
+<body>
+
+  <main class="app-container">
+
+    <!-- ================= ЭКРАН 1: РЕГИСТРАЦИЯ / ВХОД ================= -->
+    <section id="authScreen" class="screen active">
+      <div class="glass-panel">
+        <h1 class="logo-text">УГАДАЙ КТО?</h1>
+        <p class="logo-sub">Сетевая дуэль на двоих</p>
+
+        <div class="auth-tabs">
+          <button id="tabLogin" class="tab-btn active" onclick="switchAuthMode('login')">Вход</button>
+          <button id="tabRegister" class="tab-btn" onclick="switchAuthMode('register')">Регистрация</button>
+        </div>
+
+        <div class="input-box">
+          <label class="field-label">Ваш уникальный никнейм</label>
+          <input type="text" id="authNick" class="styled-input" placeholder="Например: Анна" maxlength="14">
+        </div>
+
+        <div class="input-box">
+          <label class="field-label">Пароль</label>
+          <input type="password" id="authPass" class="styled-input" placeholder="Минимум 6 символов">
+        </div>
+
+        <button id="authSubmitBtn" class="action-btn btn-blue" onclick="handleAuth()">Войти</button>
+        <p id="authMessage" class="error-text"></p>
+      </div>
+    </section>
+
+    <!-- ================= ЭКРАН 2: ЛОББИ КОМНАТ ================= -->
+    <section id="lobbyScreen" class="screen">
+      <div class="glass-panel">
+        <div class="user-profile-header">
+          <span id="userBadgeLabel">👤 Загрузка...</span>
+          <button class="logout-btn" onclick="handleLogout()">Выйти</button>
+        </div>
+
+        <h2 class="section-title">Создание игры</h2>
+        <button class="action-btn btn-gold" onclick="createNewRoom()">✨ Создать новую комнату</button>
+
+        <div class="divider-line">
+          <span>ИЛИ ПОДКЛЮЧИТЕСЬ</span>
+        </div>
+
+        <div class="input-box">
+          <label class="field-label">Код комнаты друга (4 цифры)</label>
+          <input type="number" id="roomJoinInput" class="styled-input text-center font-bold" placeholder="0000">
+        </div>
+
+        <button class="action-btn btn-outline" onclick="joinRoomByCode()">🔗 Войти в комнату</button>
+        <p id="lobbyMessage" class="status-text"></p>
+      </div>
+    </section>
+
+    <!-- ================= ЭКРАН 3: ОЖИДАНИЕ И ВЫБОР ПАКА ================= -->
+    <section id="roomScreen" class="screen">
+      <div class="glass-panel text-center">
+        <p class="field-label">Код для подключения друга</p>
+        <h2 id="roomCodeDisplay" class="giant-code">----</h2>
+
+        <div class="input-box text-left">
+          <label class="field-label">Выберите тематический пак</label>
+          <select id="packSelector" class="styled-select" onchange="onPackSelectionChanged()">
+            <option value="cars">🚗 Марки Машин</option>
+            <option value="celebrities">🌟 Знаменитости</option>
+            <option value="bloggers">🎥 Блогеры</option>
+            <option value="ufc">🥊 Бойцы UFC</option>
+            <option value="flags">🌍 Флаги стран</option>
+            <option value="food">🍕 Блюда мира</option>
+            <option value="neutral">📦 Нейтральная</option>
+            <option value="animals">🦁 Животные</option>
+            <option value="fruits">🍎 Фрукты</option>
+            <option value="brands">🏷️ Бренды</option>
+          </select>
+        </div>
+
+        <div id="playerStatusBadge" class="info-badge">
+          ⏳ Ожидание соперника... (1/2)
+        </div>
+
+        <button id="startMatchBtn" class="action-btn btn-blue" onclick="startMatch()" disabled>🚀 Начать дуэль</button>
+      </div>
+    </section>
+
+    <!-- ================= ЭКРАН 4: ИГРОВОЙ ЭКРАН ================= -->
+    <section id="gameScreen" class="screen">
+      <div class="hud-header">
+        <div id="gameScoreLabel" class="hud-score">0 : 0</div>
+        <div class="hud-turn-info">
+          <span id="gamePhaseLabel" class="hud-phase">Фаза выбора</span>
+          <span id="gameTurnLabel" class="hud-status">Выбери карту</span>
+        </div>
+        <div id="gameTimerLabel" class="hud-timer">30</div>
+      </div>
+
+      <!-- Превью твоей секретной карты -->
+      <div class="secret-card-preview-bar">
+        <div id="secretCardImg" class="secret-mini-img">❓</div>
+        <div class="text-left">
+          <p class="secret-title">Твоя секретная карта:</p>
+          <p id="secretCardName" class="secret-name">Выберите карту в сетке</p>
+        </div>
+      </div>
+
+      <!-- Игровое поле 5x5 -->
+      <div id="boardGrid" class="board-grid"></div>
+
+      <!-- Кнопки действий -->
+      <div class="game-actions">
+        <button id="closeCardsBtn" class="action-btn btn-blue" onclick="confirmClosedCards()" disabled>❌ Исключить карты</button>
+        <button id="makeGuessBtn" class="action-btn btn-gold" onclick="triggerFinalGuess()" disabled>🎯 Угадать досрочно</button>
+      </div>
+
+      <!-- Чат -->
+      <div class="chat-container">
+        <div id="chatMessages" class="chat-messages-area"></div>
+        <div class="chat-input-bar">
+          <input type="text" id="chatInput" placeholder="Спросить соперника..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+          <button onclick="sendChatMessage()">Отправить</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Модальное окно победы/поражения -->
+  <div id="gameResultModal" class="modal-backdrop">
+    <div class="modal-box">
+      <span id="modalEmoji" style="font-size: 64px;">🏆</span>
+      <h2 id="modalTitle">ПОБЕДА!</h2>
+      <p id="modalDesc">Вы угадали карту!</p>
+      <button class="action-btn btn-blue" onclick="restartNewRound()">🔄 Начать заново</button>
+    </div>
+  </div>
+
+</body>
+</html>
