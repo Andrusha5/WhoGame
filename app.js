@@ -10,8 +10,6 @@ const firebaseConfig = {
 
 if (typeof firebase !== 'undefined') {
   firebase.initializeApp(firebaseConfig);
-} else {
-  console.warn("Предупреждение: библиотеки Firebase еще загружаются...");
 }
 
 const auth = firebase.auth();
@@ -69,7 +67,6 @@ function getPackItems(packKey) {
   if (PACK_REGISTRY[packKey]) {
     return PACK_REGISTRY[packKey];
   }
-  
   const items = [];
   for (let i = 1; i <= 25; i++) {
     items.push({ name: `#${i}`, file: `${i}.jpg` });
@@ -78,6 +75,9 @@ function getPackItems(packKey) {
 }
 
 let myNickname = "";
+let myAvatarData = "";
+let myStats = { wins: 0, games: 0 };
+
 let currentRoomId = null;
 let isHost = false;
 let currentAuthMode = "login";
@@ -85,6 +85,9 @@ let activePack = "cars";
 
 let mySecretCardIdx = -1;
 let opponentSecretCardIdx = -1;
+let opponentNickname = "Соперник";
+let opponentAvatarData = "";
+
 let isMyTurn = false;
 let gameTimerValue = 30;
 let gameTimerInterval = null;
@@ -97,13 +100,7 @@ function showScreen(screenId) {
   const screens = ["authScreen", "lobbyScreen", "roomScreen", "gameScreen"];
   screens.forEach(id => {
     const el = $(id);
-    if (el) {
-      if (id === screenId) {
-        el.classList.remove("hidden");
-      } else {
-        el.classList.add("hidden");
-      }
-    }
+    if (el) el.classList.toggle("hidden", id !== screenId);
   });
 }
 
@@ -114,16 +111,19 @@ window.addEventListener('DOMContentLoaded', () => {
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     try {
-      const snapshot = await db.ref(`users/${user.uid}/nickname`).once('value');
+      const snapshot = await db.ref(`users/${user.uid}`).once('value');
       if (snapshot.exists()) {
-        myNickname = snapshot.val();
-        $("userBadgeLabel").innerText = `👤 ${myNickname}`;
+        const uData = snapshot.val();
+        myNickname = uData.nickname || "Игрок";
+        myAvatarData = uData.avatar || "";
+        myStats = uData.stats || { wins: 0, games: 0 };
+
+        updateMyProfileUI();
         showScreen("lobbyScreen");
       } else {
         showScreen("authScreen");
       }
     } catch (e) {
-      console.error(e);
       showScreen("authScreen");
     }
   } else {
@@ -131,11 +131,54 @@ auth.onAuthStateChanged(async (user) => {
   }
 });
 
+function updateMyProfileUI() {
+  $("userBadgeLabel").innerText = myNickname;
+  $("userStatsLabel").innerText = `Побед: ${myStats.wins || 0} | Игр: ${myStats.games || 0}`;
+
+  const avEl = $("myAvatarImg");
+  if (myAvatarData) {
+    avEl.innerHTML = `<img src="${myAvatarData}">`;
+  } else {
+    avEl.innerHTML = myNickname.charAt(0).toUpperCase();
+  }
+}
+
+function triggerAvatarUpload() {
+  $("avatarFileInput").click();
+}
+
+function handleAvatarFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, 128, 128);
+
+      myAvatarData = canvas.toDataURL('image/jpeg', 0.8);
+      updateMyProfileUI();
+
+      const user = auth.currentUser;
+      if (user) {
+        db.ref(`users/${user.uid}/avatar`).set(myAvatarData);
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function switchAuthMode(mode) {
   currentAuthMode = mode;
   $("tabLogin").classList.toggle("active", mode === "login");
   $("tabRegister").classList.toggle("active", mode === "register");
-  $("authSubmitBtn").innerText = mode === "login" ? "Войти" : "Зарегистрироваться";
+  $("authSubmitBtn").innerText = mode === "login" ? "Войти в аккаунт" : "Зарегистрироваться";
   $("authMessage").innerText = "";
 }
 
@@ -165,32 +208,44 @@ async function handleAuth() {
       const userCredential = await auth.createUserWithEmailAndPassword(`${normalizedNick}@whogame.local`, pass);
       const uid = userCredential.user.uid;
 
+      const initUserData = {
+        nickname: nick,
+        avatar: "",
+        stats: { wins: 0, games: 0 }
+      };
+
       await db.ref(`taken_nicknames/${normalizedNick}`).set(uid);
-      await db.ref(`users/${uid}`).set({ nickname: nick });
+      await db.ref(`users/${uid}`).set(initUserData);
 
       myNickname = nick;
+      myAvatarData = "";
+      myStats = { wins: 0, games: 0 };
     } else {
       const userCredential = await auth.signInWithEmailAndPassword(`${normalizedNick}@whogame.local`, pass);
       const uid = userCredential.user.uid;
 
-      const nickSnap = await db.ref(`users/${uid}/nickname`).once('value');
-      myNickname = nickSnap.val();
+      const snapshot = await db.ref(`users/${uid}`).once('value');
+      const uData = snapshot.val();
+      myNickname = uData.nickname;
+      myAvatarData = uData.avatar || "";
+      myStats = uData.stats || { wins: 0, games: 0 };
     }
 
-    $("userBadgeLabel").innerText = `👤 ${myNickname}`;
+    updateMyProfileUI();
     showScreen("lobbyScreen");
 
   } catch (error) {
     msgEl.innerText = error.message;
   } finally {
     $("authSubmitBtn").disabled = false;
-    $("authSubmitBtn").innerText = currentAuthMode === "login" ? "Войти" : "Зарегистрироваться";
+    $("authSubmitBtn").innerText = currentAuthMode === "login" ? "Войти в аккаунт" : "Зарегистрироваться";
   }
 }
 
 async function handleLogout() {
   await auth.signOut();
   myNickname = "";
+  myAvatarData = "";
   $("authNick").value = "";
   $("authPass").value = "";
   showScreen("authScreen");
@@ -204,9 +259,13 @@ async function createNewRoom() {
   await db.ref(`rooms/${currentRoomId}`).set({
     roomId: currentRoomId,
     host: myNickname,
+    hostAvatar: myAvatarData,
     guest: "",
+    guestAvatar: "",
     pack: activePack || "cars",
     state: "waiting",
+    hostCard: -1,
+    guestCard: -1,
     hostScore: 0,
     guestScore: 0
   });
@@ -237,7 +296,11 @@ async function joinRoomByCode() {
     return;
   }
 
-  await db.ref(`rooms/${currentRoomId}`).update({ guest: myNickname });
+  await db.ref(`rooms/${currentRoomId}`).update({
+    guest: myNickname,
+    guestAvatar: myAvatarData
+  });
+
   $("roomCodeDisplay").innerText = currentRoomId;
   $("packSelector").disabled = true;
   $("playerStatusBadge").innerText = "⏳ Ожидаем запуск от создателя...";
@@ -302,9 +365,26 @@ function setupGameScene(room) {
   opponentSecretCardIdx = -1;
   isMyTurn = false;
 
-  $("gameScoreLabel").innerText = `${room.hostScore || 0} : ${room.guestScore || 0}`;
+  opponentNickname = isHost ? (room.guest || "Соперник") : room.host;
+  opponentAvatarData = isHost ? (room.guestAvatar || "") : (room.hostAvatar || "");
+
+  $("hudMyName").innerText = myNickname;
+  $("hudMyScore").innerText = `Счет: ${isHost ? (room.hostScore || 0) : (room.guestScore || 0)}`;
+
+  const myAvEl = $("hudMyAvatar");
+  if (myAvatarData) myAvEl.innerHTML = `<img src="${myAvatarData}">`;
+  else myAvEl.innerText = myNickname.charAt(0).toUpperCase();
+
+  $("hudOpponentName").innerText = opponentNickname;
+  $("hudOpponentScore").innerText = `Счет: ${isHost ? (room.guestScore || 0) : (room.hostScore || 0)}`;
+
+  const oppAvEl = $("hudOpponentAvatar");
+  if (opponentAvatarData) oppAvEl.innerHTML = `<img src="${opponentAvatarData}">`;
+  else oppAvEl.innerText = opponentNickname.charAt(0).toUpperCase();
+
   $("gamePhaseLabel").innerText = "ФАЗА ВЫБОРА";
-  $("gameTurnLabel").innerText = "НАЖМИТЕ НА СВОЮ ТАЙНУЮ КАРТУ";
+  $("gameTurnBar").innerText = "НАЖМИТЕ НА СВОЮ ТАЙНУЮ КАРТУ В СЕТКЕ";
+  $("gameTurnBar").className = "turn-banner";
 
   const grid = $("boardGrid");
   grid.innerHTML = "";
@@ -334,7 +414,7 @@ function setupGameScene(room) {
 }
 
 function handleImgError(imgElement, packKey, index) {
-  const fallbacks = [".png", ".jfif", ".jpg", ".webp"];
+  const fallbacks = [".png", ".jfif", ".jpg", ".webp", ".JPEG", ".PNG"];
   let step = parseInt(imgElement.getAttribute("data-error-step") || "0");
 
   if (step < fallbacks.length) {
@@ -391,6 +471,7 @@ function startSelectionTimer() {
 }
 
 function startTurnSystem() {
+  clearInterval(gameTimerInterval);
   $("gamePhaseLabel").innerText = "ИГРА";
   isMyTurn = isHost;
   updateTurnVisuals();
@@ -418,14 +499,28 @@ function startTurnTimer() {
 }
 
 function updateTurnVisuals() {
-  $("gameTurnLabel").innerText = isMyTurn ? "ВАШ ХОД! (Исключите карты или угадайте)" : "ХОД СОПЕРНИКА...";
-  $("gameTurnLabel").style.color = isMyTurn ? "var(--cyan)" : "var(--red)";
+  const turnBanner = $("gameTurnBar");
+  if (isMyTurn) {
+    turnBanner.innerText = "ВАШ ХОД! (Исключите карты или угадайте)";
+    turnBanner.className = "turn-banner";
+  } else {
+    turnBanner.innerText = `ХОД ИГРОКА ${opponentNickname}...`;
+    turnBanner.className = "turn-banner red";
+  }
+
   $("closeCardsBtn").disabled = true;
   $("makeGuessBtn").disabled = true;
 }
 
 function updateGameState(room) {
   opponentSecretCardIdx = isHost ? room.guestCard : room.hostCard;
+
+  if ($("gamePhaseLabel").innerText === "ФАЗА ВЫБОРА") {
+    if (room.hostCard && room.hostCard !== -1 && room.guestCard && room.guestCard !== -1) {
+      startTurnSystem();
+      return;
+    }
+  }
 
   if (room.turn) {
     isMyTurn = (isHost && room.turn === "host") || (!isHost && room.turn === "guest");
@@ -473,47 +568,37 @@ function triggerFinalGuess() {
   });
 }
 
-function showRoundResult(winner) {
+async function showRoundResult(winner) {
   clearInterval(gameTimerInterval);
   const modal = $("gameResultModal");
   const iWon = (isHost && winner === "host") || (!isHost && winner === "guest");
 
   $("modalEmoji").innerText = iWon ? "🏆" : "😢";
   $("modalTitle").innerText = iWon ? "ПОБЕДА!" : "ПОРАЖЕНИЕ";
-  $("modalDesc").innerText = iWon ? "Вы угадали карту соперника!" : "Соперник победил в этом раунде!";
+  $("modalDesc").innerText = iWon ? "Вы отлично угадали карту соперника!" : `Соперник ${opponentNickname} победил в этом раунде!`;
+
+  const user = auth.currentUser;
+  if (user) {
+    myStats.games = (myStats.games || 0) + 1;
+    if (iWon) myStats.wins = (myStats.wins || 0) + 1;
+
+    await db.ref(`users/${user.uid}/stats`).set(myStats);
+    updateMyProfileUI();
+  }
 
   modal.classList.add("active");
 }
 
-async function restartNewRound() {
-  if (!isHost) {
-    alert("Ожидайте, пока создатель перезапустит раунд!");
-    return;
-  }
-
-  const roomRef = db.ref(`rooms/${currentRoomId}`);
-  const snap = await roomRef.once('value');
-  const room = snap.val();
-
-  let hScore = room.hostScore || 0;
-  let gScore = room.guestScore || 0;
-
-  if (room.roundWinner === "host") hScore++;
-  else gScore++;
-
+function returnToLobbyMenu() {
+  clearInterval(gameTimerInterval);
+  $("gameResultModal").classList.remove("active");
   gameStartedOnce = false;
 
-  await roomRef.update({
-    state: "playing",
-    hostCard: -1,
-    guestCard: -1,
-    turn: "host",
-    roundWinner: null,
-    hostScore: hScore,
-    guestScore: gScore
-  });
+  if (currentRoomId) {
+    db.ref(`rooms/${currentRoomId}`).off();
+  }
 
-  $("gameResultModal").classList.remove("active");
+  showScreen("lobbyScreen");
 }
 
 function sendChatMessage() {
