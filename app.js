@@ -1,6 +1,3 @@
-// ============================================================================
-// 1. ИНИЦИАЛИЗАЦИЯ FIREBASE
-// ============================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDE6GU2eTql3LTBzJjmCCap6FQ56-STEr4",
   authDomain: "whogame-9d9ad.firebaseapp.com",
@@ -14,15 +11,12 @@ const firebaseConfig = {
 if (typeof firebase !== 'undefined') {
   firebase.initializeApp(firebaseConfig);
 } else {
-  alert("Ошибка загрузки сетевых библиотек!");
+  console.warn("Предупреждение: библиотеки Firebase еще загружаются...");
 }
 
 const auth = firebase.auth();
 const db = firebase.database();
 
-// ============================================================================
-// 2. РЕЕСТР ПАКОВ И ФАЙЛОВ
-// ============================================================================
 const PACK_REGISTRY = {
   cars: [
     { name: "Audi", file: "audi.png" }, { name: "BMW", file: "bmw.png" },
@@ -65,7 +59,7 @@ const PACK_REGISTRY = {
     { name: "Эмодзи 15", file: "15.jfif" }, { name: "Эмодзи 16", file: "16.png" },
     { name: "Эмодзи 17", file: "17.jfif" }, { name: "Эмодзи 18", file: "18.jfif" },
     { name: "Эмодзи 19", file: "19.jfif" }, { name: "Эмодзи 20", file: "20.jfif" },
-    { name: "Эмодзи 21", file: "21.jfif" }, { name: "Эмодзи 22", file: "22.jfif" },
+    { name: "Эмодзи 21", file: "21.jfif" }, { name: "Эмодзи 22", file: "22.webp" },
     { name: "Эмодзи 23", file: "23.jfif" }, { name: "Эмодзи 24", file: "24.jfif" },
     { name: "Эмодзи 25", file: "25.jfif" }
   ]
@@ -75,6 +69,7 @@ function getPackItems(packKey) {
   if (PACK_REGISTRY[packKey]) {
     return PACK_REGISTRY[packKey];
   }
+  
   const items = [];
   for (let i = 1; i <= 25; i++) {
     items.push({ name: `#${i}`, file: `${i}.jpg` });
@@ -82,9 +77,6 @@ function getPackItems(packKey) {
   return items;
 }
 
-// ============================================================================
-// 3. СИСТЕМНЫЕ ПЕРЕМЕННЫЕ
-// ============================================================================
 let myNickname = "";
 let currentRoomId = null;
 let isHost = false;
@@ -105,13 +97,20 @@ function showScreen(screenId) {
   const screens = ["authScreen", "lobbyScreen", "roomScreen", "gameScreen"];
   screens.forEach(id => {
     const el = $(id);
-    if (el) el.classList.toggle("hidden", id !== screenId);
+    if (el) {
+      if (id === screenId) {
+        el.classList.remove("hidden");
+      } else {
+        el.classList.add("hidden");
+      }
+    }
   });
 }
 
-// ============================================================================
-// 4. АВТОРИЗАЦИЯ
-// ============================================================================
+window.addEventListener('DOMContentLoaded', () => {
+  showScreen("authScreen");
+});
+
 auth.onAuthStateChanged(async (user) => {
   if (user) {
     try {
@@ -124,6 +123,7 @@ auth.onAuthStateChanged(async (user) => {
         showScreen("authScreen");
       }
     } catch (e) {
+      console.error(e);
       showScreen("authScreen");
     }
   } else {
@@ -196,9 +196,6 @@ async function handleLogout() {
   showScreen("authScreen");
 }
 
-// ============================================================================
-// 5. КОМНАТЫ
-// ============================================================================
 async function createNewRoom() {
   isHost = true;
   gameStartedOnce = false;
@@ -208,7 +205,7 @@ async function createNewRoom() {
     roomId: currentRoomId,
     host: myNickname,
     guest: "",
-    pack: "cars",
+    pack: activePack || "cars",
     state: "waiting",
     hostScore: 0,
     guestScore: 0
@@ -297,9 +294,6 @@ function startMatch() {
   }
 }
 
-// ============================================================================
-// 6. ИГРОВОЕ ПОЛЕ (ГЕНЕРАЦИЯ 25 КАРТОЧЕК)
-// ============================================================================
 function setupGameScene(room) {
   showScreen("gameScreen");
   clearInterval(gameTimerInterval);
@@ -355,10 +349,9 @@ function onCardClicked(idx) {
   const items = getPackItems(activePack);
   const cardData = items[idx - 1];
 
-  // Выбор тайной карты
   if (mySecretCardIdx === -1 && $("gamePhaseLabel").innerText === "ФАЗА ВЫБОРА") {
     mySecretCardIdx = idx;
-    $("secretCardImg").innerHTML = `<img src="packs/${activePack}/${cardData.file}" style="width:100%;height:100%;object-fit:cover;">`;
+    $("secretCardImg").innerHTML = `<img src="packs/${activePack}/${cardData.file}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://via.placeholder.com/150/141d2f/00f2fe?text=${idx}'">`;
     $("secretCardName").innerText = cardData.name;
 
     const updateData = {};
@@ -367,7 +360,6 @@ function onCardClicked(idx) {
     return;
   }
 
-  // Игра
   if ($("gamePhaseLabel").innerText !== "ИГРА") return;
   if (cardsStateArray[idx - 1].closed) return;
   if (!isMyTurn) return;
@@ -380,9 +372,6 @@ function onCardClicked(idx) {
   $("makeGuessBtn").disabled = selectedCount !== 1;
 }
 
-// ============================================================================
-// 7. ТАЙМЕРЫ И ХОДЫ
-// ============================================================================
 function startSelectionTimer() {
   gameTimerValue = 30;
   $("gameTimerLabel").innerText = gameTimerValue;
