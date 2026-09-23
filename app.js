@@ -132,6 +132,7 @@ let gameTimerValue = 30;
 let gameTimerInterval = null;
 let cardsStateArray = [];
 let gameStartedOnce = false;
+let lastTurnPlayer = null; // Добавь эту переменную чуть выше функций в app.js
 
 const $ = (id) => document.getElementById(id);
 
@@ -498,10 +499,15 @@ function onCardClicked(idx) {
   const cardData = items[idx - 1];
 
   // ВЫБОР СЕКРЕТНОЙ КАРТЫ С ЗАЩИТОЙ ОТ ПОВТОРНОГО НАЖАТИЯ
-  if (mySecretCardIdx === -1 && $("gamePhaseLabel").innerText === "ФАЗА ВЫБОРА") {
-    mySecretCardIdx = idx;
-    $("secretCardImg").innerHTML = `<img src="packs/${activePack}/${cardData.file}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://via.placeholder.com/150/141d2f/00f2fe?text=${idx}'">`;
-    $("secretCardName").innerText = cardData.name;
+ if (mySecretCardIdx === -1 && $("gamePhaseLabel").innerText === "ФАЗА ВЫБОРА") {
+  mySecretCardIdx = idx;
+  
+  // Берём путь к картинке прямо из уже успешно подгруженной карточки сетки
+  const cardImgElem = document.querySelector(`#card-${idx} img`);
+  const activeImgSrc = cardImgElem ? cardImgElem.src : `packs/${activePack}/${cardData.file}`;
+
+  $("secretCardImg").innerHTML = `<img src="${activeImgSrc}" style="width:100%;height:100%;object-fit:cover;">`;
+  $("secretCardName").innerText = cardData.name;
 
     const updateData = {};
     updateData[isHost ? "hostCard" : "guestCard"] = idx;
@@ -512,7 +518,7 @@ function onCardClicked(idx) {
   if ($("gamePhaseLabel").innerText !== "ИГРА") return;
   if (cardsStateArray[idx - 1].closed) return;
   // Нельзя выбирать свою тайную карту для исключения
-  if (idx === mySecretCardIdx) return;
+  
   if (!isMyTurn) return;
 
   cardsStateArray[idx - 1].selected = !cardsStateArray[idx - 1].selected;
@@ -597,8 +603,15 @@ function updateGameState(room) {
   }
 
   if (room.turn) {
+    const previousTurn = isMyTurn;
     isMyTurn = (isHost && room.turn === "host") || (!isHost && room.turn === "guest");
     updateTurnVisuals();
+
+    // Если ход сменился на нового игрока — перезапускаем таймер с 75 секунд заново!
+    if (lastTurnPlayer !== room.turn) {
+      lastTurnPlayer = room.turn;
+      startTurnTimer();
+    }
   }
 
   if (room.roundWinner) {
