@@ -527,7 +527,7 @@ function onCardClicked(idx) {
 // 7. ТАЙМЕРЫ И МГНОВЕННЫЙ СТАРТ
 // ============================================================================
 function startSelectionTimer() {
-  gameTimerValue = 30;
+  gameTimerValue = 33;
   $("gameTimerLabel").innerText = gameTimerValue;
 
   gameTimerInterval = setInterval(() => {
@@ -558,7 +558,7 @@ function startTurnSystem() {
 
 function startTurnTimer() {
   clearInterval(gameTimerInterval);
-  gameTimerValue = 60;
+  gameTimerValue = 75; // <--- установили 75 секунд на ход
   $("gameTimerLabel").innerText = gameTimerValue;
 
   gameTimerInterval = setInterval(() => {
