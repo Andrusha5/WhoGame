@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Угадай Кто? — Премиум Онлайн</title>
+  
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Библиотеки Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  
+  <script defer src="app.js"></script>
+</head>
+<body>
+
+  <main class="app-container">
+
+    <!-- ЭКРАН 1: РЕГИСТРАЦИЯ И ВХОД -->
+    <section id="authScreen" class="screen">
+      <div class="glass-panel">
+        <h1 class="logo-text">УГАДАЙ КТО?</h1>
+        <p class="logo-sub">Сетевая дуэль на двоих</p>
+
+        <div class="auth-tabs">
+          <button id="tabLogin" class="tab-btn active" onclick="switchAuthMode('login')">Вход</button>
+          <button id="tabRegister" class="tab-btn" onclick="switchAuthMode('register')">Регистрация</button>
+        </div>
+
+        <div class="input-box">
+          <label class="field-label">Ваш уникальный никнейм</label>
+          <input type="text" id="authNick" class="styled-input" placeholder="Например: Анна" maxlength="14">
+        </div>
+
+        <div class="input-box">
+          <label class="field-label">Пароль</label>
+          <input type="password" id="authPass" class="styled-input" placeholder="Минимум 6 символов">
+        </div>
+
+        <button id="authSubmitBtn" class="action-btn btn-blue" onclick="handleAuth()">Войти</button>
+        <p id="authMessage" class="error-text"></p>
+      </div>
+    </section>
+
+    <!-- ЭКРАН 2: ЛОББИ -->
+    <section id="lobbyScreen" class="screen hidden">
+      <div class="glass-panel">
+        <div class="user-profile-header">
+          <span id="userBadgeLabel">👤 Игрок</span>
+          <button class="logout-btn" onclick="handleLogout()">Выйти</button>
+        </div>
+
+        <h2 style="font-size: 20px; text-align: center; margin-bottom: 16px;">Выбор комнаты</h2>
+        <button class="action-btn btn-gold" onclick="createNewRoom()">✨ Создать новую комнату</button>
+
+        <div class="divider-line">
+          <span>ИЛИ ПОДКЛЮЧИТЕСЬ</span>
+        </div>
+
+        <div class="input-box">
+          <label class="field-label">Код комнаты друга (4 цифры)</label>
+          <input type="number" id="roomJoinInput" class="styled-input text-center font-bold" placeholder="0000">
+        </div>
+
+        <button class="action-btn btn-outline" onclick="joinRoomByCode()">🔗 Войти в комнату</button>
+        <p id="lobbyMessage" class="error-text"></p>
+      </div>
+    </section>
+
+    <!-- ЭКРАН 3: КОМНАТА -->
+    <section id="roomScreen" class="screen hidden">
+      <div class="glass-panel text-center">
+        <p class="field-label">Код для подключения друга</p>
+        <h2 id="roomCodeDisplay" class="giant-code">----</h2>
+
+        <div class="input-box">
+          <label class="field-label">Выберите тематический пак</label>
+          <select id="packSelector" class="styled-select" onchange="onPackSelectionChanged()">
+            <option value="cars">🚗 Марки Машин</option>
+            <option value="celebrities">🌟 Знаменитости</option>
+            <option value="bloggers">🎥 Блогеры</option>
+            <option value="ufc">🥊 Бойцы UFC</option>
+            <option value="flags">🌍 Флаги стран</option>
+            <option value="food">🍕 Блюда мира</option>
+            <option value="emoji">😀 Эмодзи</option>
+            <option value="animals">🦁 Животные</option>
+            <option value="fruits">🍎 Фрукты</option>
+            <option value="brands">🏷️ Бренды</option>
+          </select>
+        </div>
+
+        <div id="playerStatusBadge" class="info-badge">
+          ⏳ Ожидание соперника... (1/2)
+        </div>
+
+        <button id="startMatchBtn" class="action-btn btn-blue" onclick="startMatch()" disabled>🚀 Начать дуэль</button>
+      </div>
+    </section>
+
+    <!-- ЭКРАН 4: ИГРА -->
+    <section id="gameScreen" class="screen hidden">
+      <div style="width: 100%; text-align: center; margin-bottom: 10px;">
+        <span id="gameTurnLabel" style="font-weight: 800; color: var(--cyan);">ВАШ ХОД</span>
+      </div>
+      <div id="boardGrid" class="board-grid"></div>
+    </section>
+
+  </main>
+
+</body>
+</html>
